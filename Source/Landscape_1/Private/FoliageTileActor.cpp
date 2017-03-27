@@ -10,9 +10,6 @@
 // Sets default values
 AFoliageTileActor::AFoliageTileActor()
 {
-	SpawnNoiseSize = 1000;
-	SpawnNoiseMin = 0.0f;
-	SpawnNoiseMax = 1.0f;
 	OffsetFactor = 0.5f;
 	ScaleMin = 1.0f;
 	ScaleMax = 1.0f;
@@ -46,6 +43,7 @@ void AFoliageTileActor::BeginPlay()
 	int32 componentSize = 3;
 	float FoliageTilesize = Radius * 2 / Size;
 	float endCullDistance = Radius - (FoliageTilesize * 1.1f);
+	USceneComponent* rootComponent = GetRootComponent();
 
 	for (int32 y = 0; y < FoliageTiles.Num(); y++)
 	{
@@ -72,7 +70,7 @@ void AFoliageTileActor::BeginPlay()
 			else
 				component->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
-			component->AttachTo(GetRootComponent());
+			component->AttachTo(rootComponent);
 			component->RegisterComponent();
 			tile->MeshComponents[componentIndex] = component;
 		}	
@@ -107,11 +105,19 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 			float r1 = (double)seed / UINT32_MAX;
 			seed = Hash(seed);
 			float r2 = (double)seed / UINT32_MAX;
+			bool spawn = true;
 
 			FVector instanceLocation = FVector(location.X + split * tmpX + (split * r1 * OffsetFactor), location.Y + split * tmpY + (split * r2 * OffsetFactor), -1000000.0f);
-			float spawnNoise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / SpawnNoiseSize, instanceLocation.Y / SpawnNoiseSize) + 1) / 2.0f;
 
-			if (spawnNoise >= SpawnNoiseMin && spawnNoise <= SpawnNoiseMax)
+			for (int32 spawnNoiseIndex = 0; spawnNoiseIndex < SpawnNoise.Num(); spawnNoiseIndex++)
+			{
+				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / SpawnNoise[spawnNoiseIndex].Size, instanceLocation.Y / SpawnNoise[spawnNoiseIndex].Size) + 1) / 2.0f;
+
+				if (noise < SpawnNoise[spawnNoiseIndex].Min || noise > SpawnNoise[spawnNoiseIndex].Max)
+					spawn = false;
+			}
+
+			if (spawn)
 			{
 				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / ScaleNoiseSize, instanceLocation.Y / ScaleNoiseSize) + 1) / 2.0f;
 				float scale = ScaleMin + ((ScaleMax - ScaleMin) * noise);

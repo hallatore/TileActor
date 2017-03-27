@@ -6,6 +6,29 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "FoliageTileActor.generated.h"
 
+USTRUCT()
+struct FFoliageTileNoise
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
+		int32 Size;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+		float Min;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+		float Max;
+
+	FFoliageTileNoise()
+	{
+		Size = 1000;
+		Min = 0.0f;
+		Max = 1.0f;
+	}
+};
+
 UCLASS()
 class UFoliageTile : public UObject
 {
@@ -35,26 +58,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
 		float SpawnChance;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
-		int32 SpawnNoiseSize;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-		float SpawnNoiseMin;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-		float SpawnNoiseMax;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+		TArray<FFoliageTileNoise> SpawnNoise;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
 		float OffsetFactor;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
+		int32 ScaleNoiseSize;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
 		float ScaleMin;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
 		float ScaleMax;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
-		int32 ScaleNoiseSize;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
 		float MinCullDistance;
