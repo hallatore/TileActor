@@ -6,3 +6,4 @@ Binaries/
 Config/
 DerivedDataCache/
 *.VC.db
+*.VC.opendb

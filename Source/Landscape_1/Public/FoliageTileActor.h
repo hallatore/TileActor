@@ -6,29 +6,6 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "FoliageTileActor.generated.h"
 
-USTRUCT()
-struct FFoliageInstance
-{
-	GENERATED_USTRUCT_BODY()
-
-public:
-	UPROPERTY()
-		int32 InstanceId;
-
-	UPROPERTY()
-		FVector Location;
-
-	UPROPERTY()
-		float Scale;
-
-	UPROPERTY()
-		int32 ComponentIndex;
-
-	FFoliageInstance()
-	{
-	}
-};
-
 UCLASS()
 class UFoliageTile : public UObject
 {
@@ -37,9 +14,6 @@ class UFoliageTile : public UObject
 public:
 	UPROPERTY()
 		TArray<UHierarchicalInstancedStaticMeshComponent*> MeshComponents;
-
-	UPROPERTY()
-		TArray<FFoliageInstance> Instances;
 };
 
 UCLASS()
