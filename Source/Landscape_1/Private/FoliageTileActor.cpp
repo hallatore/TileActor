@@ -14,7 +14,7 @@ AFoliageTileActor::AFoliageTileActor()
 	ScaleMin = 1.0f;
 	ScaleMax = 1.0f;
 	ScaleNoiseSize = 1000;
-	MinCullDistance = 100.0f;
+	MinCullDistance = 0.0f;
 	HeightMin = INT32_MIN;
 	HeightMax = INT32_MAX;
 	MeshesPrTile = 1;
@@ -40,9 +40,10 @@ void AFoliageTileActor::BeginPlay()
 
 	FoliageTiles.AddUninitialized(Size * Size);
 
-	int32 componentSize = 3;
+	int32 componentSize = 2;
 	float FoliageTilesize = Radius * 2 / Size;
 	float endCullDistance = Radius - (FoliageTilesize * 1.1f);
+	float minCullDistance = MinCullDistance > 0 ? MinCullDistance : endCullDistance / 2;
 	USceneComponent* rootComponent = GetRootComponent();
 
 	for (int32 y = 0; y < FoliageTiles.Num(); y++)
@@ -60,7 +61,7 @@ void AFoliageTileActor::BeginPlay()
 			component->bHasPerInstanceHitProxies = true;
 			component->InstancingRandomSeed = seed % INT32_MAX;
 			component->bAffectDistanceFieldLighting = AffectDistanceFieldLighting;
-			float cullDistance = (endCullDistance / componentSize * (componentIndex + 1)) * FMath::Max(0.0f, (1.0f - (1.0f / endCullDistance * MinCullDistance)));
+			float cullDistance = (endCullDistance / componentSize * (componentIndex + 1)) * FMath::Max(0.0f, (1.0f - (1.0f / endCullDistance * minCullDistance)));
 			component->InstanceEndCullDistance = endCullDistance - cullDistance;
 			component->InstanceStartCullDistance = endCullDistance - cullDistance - (endCullDistance / componentSize * (componentIndex + 1));
 			component->CastShadow = CastShadow;
@@ -111,10 +112,14 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 
 			for (int32 spawnNoiseIndex = 0; spawnNoiseIndex < SpawnNoise.Num(); spawnNoiseIndex++)
 			{
-				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / SpawnNoise[spawnNoiseIndex].Size, instanceLocation.Y / SpawnNoise[spawnNoiseIndex].Size) + 1) / 2.0f;
+				float noiseSeed = 100000.0f * ((float)Hash(SpawnNoise[spawnNoiseIndex].Seed) / UINT32_MAX);
+				float noise = (USimplexNoise::SimplexNoise2D((instanceLocation.X + noiseSeed) / SpawnNoise[spawnNoiseIndex].Size, (instanceLocation.Y + noiseSeed) / SpawnNoise[spawnNoiseIndex].Size) + 1) / 2.0f;
 
 				if (noise < SpawnNoise[spawnNoiseIndex].Min || noise > SpawnNoise[spawnNoiseIndex].Max)
+				{
 					spawn = false;
+					break;
+				}
 			}
 
 			if (spawn)

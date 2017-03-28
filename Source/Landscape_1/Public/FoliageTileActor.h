@@ -21,11 +21,15 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
 		float Max;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", UIMin = "0"))
+		int32 Seed;
+
 	FFoliageTileNoise()
 	{
 		Size = 1000;
 		Min = 0.0f;
 		Max = 1.0f;
+		Seed = 0;
 	}
 };
 

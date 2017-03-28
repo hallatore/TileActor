@@ -29,7 +29,6 @@ void ATileActor::BeginPlay()
 void ATileActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	double StartTime = FPlatformTime::Seconds();
 
 	for (int32 x = 0; x < Size; x++)
 	{
@@ -45,7 +44,6 @@ void ATileActor::Tick(float DeltaTime)
 	}
 
 	FVector currentLocation = GetWorld()->GetFirstLocalPlayerFromController()->LastViewLocation;
-	currentLocation.Z = 0.0f;
 
 	float tileSize = Radius * 2 / Size;
 	float disX = currentLocation.X - CurrentTileLocation.X;
