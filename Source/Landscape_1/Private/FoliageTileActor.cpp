@@ -134,6 +134,19 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 				float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
 				FTransform transform = GetTransform(instanceLocation, Hash(seed));
 				transform.SetScale3D(FVector(scale, scale, scale));
+
+				for (int32 blockingVolumeIndex = 0; blockingVolumeIndex < BlockingVolumes.Num(); blockingVolumeIndex++)
+				{
+					if (BlockingVolumes[blockingVolumeIndex]->GetBrushComponent()->OverlapComponent(transform.GetLocation(), transform.GetRotation(), FCollisionShape()))
+					{
+						spawn = false;
+						break;
+					}
+				}
+
+				if (!spawn)
+					continue;
+
 				tile->MeshComponents[compIndex]->AddInstance(transform);
 			}
 		}

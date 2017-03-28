@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TileActor.h"
+#include "FoliageTileBlockingVolume.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "FoliageTileActor.generated.h"
 
@@ -75,6 +76,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
 		float SpawnChance;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
+		TArray<AFoliageTileBlockingVolume*> BlockingVolumes;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
 		TArray<FFoliageTileNoise> SpawnNoise;
