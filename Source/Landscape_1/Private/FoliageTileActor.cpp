@@ -1,13 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "Landscape_1.h"
 #include "FoliageTileActor.h"
 #include "SimplexNoise.h"
 #include "Runtime/Landscape/Classes/Landscape.h"
 #include "Kismet/KismetSystemLibrary.h"
 
-
-// Sets default values
 AFoliageTileActor::AFoliageTileActor()
 {
 	OffsetFactor = 0.5f;
@@ -29,10 +25,9 @@ AFoliageTileActor::AFoliageTileActor()
 	TotalMeshes = Size * Size * arraySize * arraySize * SpawnChance;
 }
 
-// Called when the game starts or when spawned
-void AFoliageTileActor::BeginPlay()
+void AFoliageTileActor::Load()
 {
-	Super::BeginPlay();
+	Super::Load();
 	uint32 seed = Hash(InitialSeed);
 
 	if (Mesh == NULL)
@@ -61,10 +56,11 @@ void AFoliageTileActor::BeginPlay()
 			component->bHasPerInstanceHitProxies = true;
 			component->InstancingRandomSeed = seed % INT32_MAX;
 			component->bAffectDistanceFieldLighting = AffectDistanceFieldLighting;
+			component->CastShadow = CastShadow;
+
 			float cullDistance = (endCullDistance / componentSize * (componentIndex + 1)) * FMath::Max(0.0f, (1.0f - (1.0f / endCullDistance * minCullDistance)));
 			component->InstanceEndCullDistance = endCullDistance - cullDistance;
 			component->InstanceStartCullDistance = endCullDistance - cullDistance - (endCullDistance / componentSize * (componentIndex + 1));
-			component->CastShadow = CastShadow;
 
 			if (Collision == false)
 				component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -76,6 +72,22 @@ void AFoliageTileActor::BeginPlay()
 			tile->MeshComponents[componentIndex] = component;
 		}	
 	}
+
+	IsLoaded = true;
+}
+
+void AFoliageTileActor::Unload() {
+	Super::Unload();
+
+	for (int32 i = 0; i < FoliageTiles.Num(); i++)
+	{
+		for (int32 y = 0; y < FoliageTiles[i]->MeshComponents.Num(); y++)
+		{
+			FoliageTiles[i]->MeshComponents[y]->ClearInstances();
+		}
+	}
+
+	FoliageTiles.Empty();
 }
 
 void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {

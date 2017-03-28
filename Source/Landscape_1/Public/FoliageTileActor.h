@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "TileActor.h"
@@ -50,7 +48,6 @@ class LANDSCAPE_1_API AFoliageTileActor : public ATileActor
 
 public:
 	AFoliageTileActor();
-	virtual void BeginPlay() override;
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -112,6 +109,8 @@ public:
 
 protected:
 	virtual void UpdateTile(int32 x, int32 y, FVector location) override;
+	virtual void Load() override;
+	virtual void Unload() override;
 
 private:
 	UPROPERTY(transient, duplicatetransient)

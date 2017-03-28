@@ -1,10 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "Landscape_1.h"
 #include "TileActor.h"
 
 ATileActor::ATileActor()
 {
+	RenderInEditor = false;
 	Size = 11;
 	PrimaryActorTick.bCanEverTick = true;
 	Radius = 10000.0f;
@@ -12,11 +11,27 @@ ATileActor::ATileActor()
 	CurrentTileX = 1;
 	CurrentTileY = 1;
 	CurrentTileLocation = FVector(-1000000.0f, -1000000.0f, -1000000.0f);
+	IsLoaded = false;
 }
 
 void ATileActor::BeginPlay()
 {
 	Super::BeginPlay();
+	IsLoadedFromBeginPlay = true;
+	Reload();
+}
+
+void ATileActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+	IsLoadedFromBeginPlay = false;
+
+	if (!RenderInEditor)
+		Unload();
+}
+
+void ATileActor::Load()
+{
 	Tiles.AddUninitialized(Size * Size);
 
 	for (int32 i = 0; i < Size * Size; i++)
@@ -24,29 +39,75 @@ void ATileActor::BeginPlay()
 		Tiles[i] = FTile();
 		Tiles[i].ShouldUpdate = true;
 	}
+
+	IsLoaded = true;
+}
+
+void ATileActor::Reload()
+{
+	Unload();
+	Load();
+}
+
+void ATileActor::Unload()
+{
+	IsLoaded = false;
+	Tiles.Empty();
+	CurrentTileX = 1;
+	CurrentTileY = 1;
+	CurrentTileLocation = FVector(-1000000.0f, -1000000.0f, -1000000.0f);
 }
 
 void ATileActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	for (int32 x = 0; x < Size; x++)
+	if (!RenderInEditor && !IsLoadedFromBeginPlay)
+		return;
+
+	if (IsLoaded == false)
 	{
-		for (int32 y = 0; y < Size; y++)
+		this->Load();
+		return;
+	}
+
+	if (Tiles.Num() == Size * Size) {
+		for (int32 x = 0; x < Size; x++)
 		{
-			FTile & tile = Tiles[GetIndex(x, y)];
-			if (tile.ShouldUpdate) {
-				tile.ShouldUpdate = false;
-				UpdateTile(x, y, tile.Location);
-				break;
+			for (int32 y = 0; y < Size; y++)
+			{
+				FTile & tile = Tiles[GetIndex(x, y)];
+				if (tile.ShouldUpdate) {
+					tile.ShouldUpdate = false;
+					UpdateTile(x, y, tile.Location);
+					break;
+				}
 			}
 		}
 	}
 
-	FVector currentLocation = GetWorld()->GetFirstLocalPlayerFromController()->LastViewLocation;
+	auto world = GetWorld();
+	if (world == nullptr)
+		return;
+
+	auto player = world->GetFirstLocalPlayerFromController();
+
+	if (player != NULL)
+	{
+		CurrentCameraLocation = player->LastViewLocation;
+	}
+	else 
+	{
+		auto viewLocations = world->ViewLocationsRenderedLastFrame;
+
+		if (viewLocations.Num() == 0)
+			return;
+
+		CurrentCameraLocation = viewLocations[0];
+	}
 
 	float tileSize = Radius * 2 / Size;
-	float disX = currentLocation.X - CurrentTileLocation.X;
+	float disX = CurrentCameraLocation.X - CurrentTileLocation.X;
 	float disY = CurrentCameraLocation.Y - CurrentTileLocation.Y;
 	bool updated = false;
 
@@ -70,9 +131,7 @@ void ATileActor::Tick(float DeltaTime)
 			CurrentTileY += Size;
 	}
 
-	CurrentCameraLocation = currentLocation;
-
-	if (updated == false)
+	if (updated == false || Tiles.Num() != Size * Size)
 		return;
 
 	for (int32 x = 0; x < Size; x++)
@@ -136,3 +195,13 @@ int32 ATileActor::GetIndex(int32 x, int32 y) {
 
 void ATileActor::UpdateTile(int32 x, int32 y, FVector location) {}
 void ATileActor::PostUpdateTiles() {}
+bool ATileActor::ShouldTickIfViewportsOnly() const
+{
+	return true;
+}
+
+void ATileActor::PostEditChangeProperty(struct FPropertyChangedEvent& e)
+{
+	Super::PostEditChangeProperty(e);
+	Reload();
+}

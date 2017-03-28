@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "GameFramework/Actor.h"
@@ -33,7 +31,13 @@ class LANDSCAPE_1_API ATileActor : public AActor
 public:
 	ATileActor();
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual bool ShouldTickIfViewportsOnly() const override;
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+		bool RenderInEditor;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 		float Radius;
@@ -42,9 +46,18 @@ protected:
 	UPROPERTY()
 		int32 Size;
 
+	UPROPERTY()
+		bool IsLoaded;
+
+	UPROPERTY()
+		bool IsLoadedFromBeginPlay;
+
 	int32 GetIndex(int32 x, int32 y);
 	virtual void UpdateTile(int32 x, int32 y, FVector location);
 	virtual void PostUpdateTiles();
+	virtual void Load();
+	virtual void Reload();
+	virtual void Unload();
 
 private:
 	UPROPERTY()
