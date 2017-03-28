@@ -6,29 +6,22 @@
 
 AFoliageTileActor::AFoliageTileActor()
 {
+	DistanceBetween = 200.0f;
 	OffsetFactor = 0.5f;
-	ScaleMin = 1.0f;
-	ScaleMax = 1.0f;
-	ScaleNoiseSize = 1000;
+	Scale = FFoliageTileNoise();
+	Scale.Min = 1.0f;
 	MinCullDistance = 0.0f;
-	HeightMin = INT32_MIN;
-	HeightMax = INT32_MAX;
-	MeshesPrTile = 1;
 	SpawnChance = 1.0f;
-	MaxSlope = 30.0f;
 	AlignWithSlope = true;
 	Collision = false;
 	AffectDistanceFieldLighting = false;
 	CastShadow = 0;
-
-	int32 arraySize = (int32)sqrt((double)MeshesPrTile);
-	TotalMeshes = Size * Size * arraySize * arraySize * SpawnChance;
 }
 
 void AFoliageTileActor::Load()
 {
 	Super::Load();
-	uint32 seed = Hash(InitialSeed);
+	uint32 seed = Hash(Seed);
 
 	if (Mesh == NULL)
 		return;
@@ -83,73 +76,66 @@ void AFoliageTileActor::Unload() {
 	{
 		for (int32 y = 0; y < FoliageTiles[i]->MeshComponents.Num(); y++)
 		{
-			FoliageTiles[i]->MeshComponents[y]->ClearInstances();
+			FoliageTiles[i]->MeshComponents[y]->DetachFromParent();
+			FoliageTiles[i]->MeshComponents[y]->UnregisterComponent();
 		}
+
+		FoliageTiles[i]->MeshComponents.Empty();
 	}
 
 	FoliageTiles.Empty();
 }
 
 void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
-	if (Mesh == NULL)
+	if (Mesh == NULL || DistanceBetween <= 0.0)
 		return;
 
 	UFoliageTile* tile = FoliageTiles[GetIndex(x, y)];
-	uint32 seed = Hash(InitialSeed + (x * Size) + y);
+	uint32 seed = Hash(Seed + (x * Size) + y);
 
 	for (int32 componentIndex = 0; componentIndex < tile->MeshComponents.Num(); componentIndex++)
 	{
 		tile->MeshComponents[componentIndex]->ClearInstances();
 	}
 
-	int32 tmpX = 0;
-	int32 tmpY = 0;
-	int32 max = sqrt((double)MeshesPrTile);
-	float FoliageTilesize = Radius * 2 / Size;
-	int32 arraySize = (int32)sqrt((double)MeshesPrTile);
-	float split = FoliageTilesize / max;
-	int32 compIndex = FMath::RandRange(0, tile->MeshComponents.Num() - 1);
+	float tileSize = Radius * 2 / Size;
+	int32 arraySize = (int32)(tileSize / DistanceBetween);
+	float split = tileSize / arraySize;
 
-	for (int32 i = 0; i < (arraySize * arraySize); i++)
+	for (int32 tileX = 0; tileX < arraySize; tileX++)
 	{
-		seed = Hash(seed);
-
-		if (SpawnChance > (double)seed / UINT32_MAX) {
-			float r1 = (double)seed / UINT32_MAX;
+		for (int32 tileY = 0; tileY < arraySize; tileY++)
+		{
+			int32 compIndex = FMath::RandRange(0, tile->MeshComponents.Num() - 1);
 			seed = Hash(seed);
-			float r2 = (double)seed / UINT32_MAX;
-			bool spawn = true;
 
-			FVector instanceLocation = FVector(location.X + split * tmpX + (split * r1 * OffsetFactor), location.Y + split * tmpY + (split * r2 * OffsetFactor), -1000000.0f);
+			if (SpawnChance > (double)seed / UINT32_MAX) {
+				float r1 = (double)Hash(seed) / UINT32_MAX;
+				float r2 = (double)Hash(seed) / UINT32_MAX;
+				bool spawn = true;
+				FVector instanceLocation = FVector(location.X + split * tileX + (split * r1 * OffsetFactor), location.Y + split * tileY + (split * r2 * OffsetFactor), -1000000.0f);
 
-			for (int32 spawnNoiseIndex = 0; spawnNoiseIndex < SpawnNoise.Num(); spawnNoiseIndex++)
-			{
-				float noiseSeed = 100000.0f * ((float)Hash(SpawnNoise[spawnNoiseIndex].Seed) / UINT32_MAX);
-				float noise = (USimplexNoise::SimplexNoise2D((instanceLocation.X + noiseSeed) / SpawnNoise[spawnNoiseIndex].Size, (instanceLocation.Y + noiseSeed) / SpawnNoise[spawnNoiseIndex].Size) + 1) / 2.0f;
-
-				if (noise < SpawnNoise[spawnNoiseIndex].Min || noise > SpawnNoise[spawnNoiseIndex].Max)
+				for (int32 spawnNoiseIndex = 0; spawnNoiseIndex < SpawnNoise.Num(); spawnNoiseIndex++)
 				{
-					spawn = false;
-					break;
-				}
-			}
+					float noiseSeed = 100000.0f * ((float)Hash(SpawnNoise[spawnNoiseIndex].Seed) / UINT32_MAX);
+					float noise = (USimplexNoise::SimplexNoise2D((instanceLocation.X + noiseSeed) / SpawnNoise[spawnNoiseIndex].NoiseSize, (instanceLocation.Y + noiseSeed) / SpawnNoise[spawnNoiseIndex].NoiseSize) + 1) / 2.0f;
 
-			if (spawn)
-			{
-				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / ScaleNoiseSize, instanceLocation.Y / ScaleNoiseSize) + 1) / 2.0f;
-				float scale = ScaleMin + ((ScaleMax - ScaleMin) * noise);
-				FTransform transform = GetTransform(instanceLocation, seed);
+					if (noise < SpawnNoise[spawnNoiseIndex].Min || noise > SpawnNoise[spawnNoiseIndex].Max)
+					{
+						spawn = false;
+						break;
+					}
+				}
+
+				if (!spawn)
+					continue;
+
+				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / Scale.NoiseSize, instanceLocation.Y / Scale.NoiseSize) + 1) / 2.0f;
+				float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
+				FTransform transform = GetTransform(instanceLocation, Hash(seed));
 				transform.SetScale3D(FVector(scale, scale, scale));
 				tile->MeshComponents[compIndex]->AddInstance(transform);
 			}
-		}
-
-		compIndex = FMath::RandRange(0, tile->MeshComponents.Num() - 1);
-		tmpX++;
-
-		if (tmpX >= max) {
-			tmpX = 0;
-			tmpY++;
 		}
 	}
 }
@@ -176,24 +162,6 @@ FTransform AFoliageTileActor::GetTransform(FVector location, uint32 seed) {
 	{
 		if (HitData.GetActor() && HitData.Actor->IsA(ALandscape::StaticClass()))
 		{
-			if (PhysicalMaterials.Num() > 0) {
-				if (HitData.PhysMaterial == NULL) {
-					return result;
-				}
-
-				auto name = HitData.PhysMaterial->GetName();
-				bool found = false;
-
-				for (int i = 0; i < PhysicalMaterials.Num(); i++)
-				{
-					if (PhysicalMaterials[i]->GetName() == name)
-						found = true;
-				}
-
-				if (found == false)
-					return result;
-			}
-
 			result.SetTranslation(FVector(location.X, location.Y, HitData.ImpactPoint.Z));
 
 			if (AlignWithSlope == true)
@@ -205,13 +173,6 @@ FTransform AFoliageTileActor::GetTransform(FVector location, uint32 seed) {
 	}
 
 	return result;
-}
-
-void AFoliageTileActor::PostEditChangeProperty(struct FPropertyChangedEvent& e)
-{
-	Super::PostEditChangeProperty(e);
-	int32 arraySize = (int32)sqrt((double)MeshesPrTile);
-	TotalMeshes = Size * Size * arraySize * arraySize * SpawnChance;
 }
 
 uint32 AFoliageTileActor::Hash(uint32 a)

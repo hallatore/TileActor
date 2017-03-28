@@ -36,10 +36,10 @@ public:
 	virtual bool ShouldTickIfViewportsOnly() const override;
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Advanced")
 		bool RenderInEditor;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
 		float Radius;
 
 protected:

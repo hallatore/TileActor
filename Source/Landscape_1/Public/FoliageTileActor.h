@@ -11,7 +11,7 @@ struct FFoliageTileNoise
 
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
-		int32 Size;
+		int32 NoiseSize;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
 		float Min;
@@ -24,7 +24,7 @@ public:
 
 	FFoliageTileNoise()
 	{
-		Size = 1000;
+		NoiseSize = 1000;
 		Min = 0.0f;
 		Max = 1.0f;
 		Seed = 0;
@@ -48,64 +48,43 @@ class LANDSCAPE_1_API AFoliageTileActor : public ATileActor
 
 public:
 	AFoliageTileActor();
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		UStaticMesh* Mesh;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		int32 MeshesPrTile;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Mesh")
+		FFoliageTileNoise Scale;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
-		float SpawnChance;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		TArray<FFoliageTileNoise> SpawnNoise;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
-		float OffsetFactor;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
-		int32 ScaleNoiseSize;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
-		float ScaleMin;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
-		float ScaleMax;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
-		float MinCullDistance;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		float HeightMin;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		float HeightMax;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		float MaxSlope;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		bool AlignWithSlope;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		bool Collision;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		bool AffectDistanceFieldLighting;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Mesh")
 		uint32 CastShadow : 1;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		TArray<UPhysicalMaterial*> PhysicalMaterials;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
+		bool AffectDistanceFieldLighting;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-		int32 InitialSeed;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
+		float DistanceBetween;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-		int32 TotalMeshes;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
+		float OffsetFactor;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
+		float SpawnChance;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
+		TArray<FFoliageTileNoise> SpawnNoise;
+
+	/** A value of 0.0 causes this to be calculated to 50 % of the radius. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
+		float MinCullDistance;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Advanced")
+		int32 Seed;
 
 protected:
 	virtual void UpdateTile(int32 x, int32 y, FVector location) override;

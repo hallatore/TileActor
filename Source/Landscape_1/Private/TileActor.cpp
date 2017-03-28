@@ -203,5 +203,7 @@ bool ATileActor::ShouldTickIfViewportsOnly() const
 void ATileActor::PostEditChangeProperty(struct FPropertyChangedEvent& e)
 {
 	Super::PostEditChangeProperty(e);
-	Reload();
+
+	if (RenderInEditor)
+		Reload();
 }
