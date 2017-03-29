@@ -206,4 +206,6 @@ void ATileActor::PostEditChangeProperty(struct FPropertyChangedEvent& e)
 
 	if (RenderInEditor)
 		Reload();
+	else
+		Unload();
 }

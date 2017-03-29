@@ -78,7 +78,7 @@ public:
 		float SpawnChance;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
-		TArray<AFoliageTileBlockingVolume*> BlockingVolumes;
+		FName Layer;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
 		TArray<FFoliageTileNoise> SpawnNoise;
@@ -100,5 +100,5 @@ private:
 		TArray<UFoliageTile*> FoliageTiles;
 
 	uint32 Hash(uint32 a);
-	FTransform GetTransform(FVector location, uint32 seed);
+	FTransform GetTransform(FVector location, uint32 seed, TArray<AActor*> actorsToIgnore);
 };

@@ -76,6 +76,7 @@ void AFoliageTileActor::Unload() {
 	{
 		for (int32 y = 0; y < FoliageTiles[i]->MeshComponents.Num(); y++)
 		{
+			FoliageTiles[i]->MeshComponents[y]->ClearInstances();
 			FoliageTiles[i]->MeshComponents[y]->DetachFromParent();
 			FoliageTiles[i]->MeshComponents[y]->UnregisterComponent();
 		}
@@ -90,6 +91,8 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 	if (Mesh == NULL || DistanceBetween <= 0.0)
 		return;
 
+	TArray<AActor*> blockingVolumes;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFoliageTileBlockingVolume::StaticClass(), blockingVolumes);
 	UFoliageTile* tile = FoliageTiles[GetIndex(x, y)];
 	uint32 seed = Hash(Seed + (x * Size) + y);
 
@@ -131,16 +134,21 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 					continue;
 
 				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / Scale.NoiseSize, instanceLocation.Y / Scale.NoiseSize) + 1) / 2.0f;
+				FTransform transform = GetTransform(instanceLocation, Hash(seed), blockingVolumes);
 				float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
-				FTransform transform = GetTransform(instanceLocation, Hash(seed));
 				transform.SetScale3D(FVector(scale, scale, scale));
 
-				for (int32 blockingVolumeIndex = 0; blockingVolumeIndex < BlockingVolumes.Num(); blockingVolumeIndex++)
+				for (int32 blockingVolumeIndex = 0; blockingVolumeIndex < blockingVolumes.Num(); blockingVolumeIndex++)
 				{
-					if (BlockingVolumes[blockingVolumeIndex]->GetBrushComponent()->OverlapComponent(transform.GetLocation(), transform.GetRotation(), FCollisionShape()))
+					auto volume = (AFoliageTileBlockingVolume*)blockingVolumes[blockingVolumeIndex];
+					if (volume->GetBrushComponent()->OverlapComponent(transform.GetLocation(), transform.GetRotation(), FCollisionShape()))
 					{
-						spawn = false;
-						break;
+						if ((Layer == NAME_None && volume->FoliageLayers.Num() == 0) ||
+							(Layer != NAME_None && volume->FoliageLayers.Contains(Layer)))
+						{
+							spawn = false;
+							break;
+						}						
 					}
 				}
 
@@ -153,7 +161,7 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 	}
 }
 
-FTransform AFoliageTileActor::GetTransform(FVector location, uint32 seed) {
+FTransform AFoliageTileActor::GetTransform(FVector location, uint32 seed, TArray<AActor*> actorsToIgnore) {
 	const FVector Start = FVector(location.X, location.Y, 100000.0f);
 	const FVector End = FVector(location.X, location.Y, -100000.0f);
 	float r = (double)seed / UINT32_MAX;
@@ -162,16 +170,12 @@ FTransform AFoliageTileActor::GetTransform(FVector location, uint32 seed) {
 	FQuat rotator = FQuat(FRotator(0.0f, 360.0f * r, 0.0f));
 	result.SetTranslation(FVector(-1.0f, -1.0f, -100000.0f));
 	result.SetRotation(rotator);
-
 	FHitResult HitData(ForceInit);
-	TArray<AActor*> ActorsToIgnore;
-	ActorsToIgnore.Add(NULL);
-
 	TArray<TEnumAsByte<enum EObjectTypeQuery> > Objects;
 	Objects.Add(EObjectTypeQuery::ObjectTypeQuery1);
 
 	// Todo: Find a way to trace only landscapes for better performance
-	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), Start, End, Objects, false, ActorsToIgnore, EDrawDebugTrace::None, HitData, true))
+	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), Start, End, Objects, false, actorsToIgnore, EDrawDebugTrace::None, HitData, true))
 	{
 		if (HitData.GetActor() && HitData.Actor->IsA(ALandscape::StaticClass()))
 		{
