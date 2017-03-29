@@ -18,7 +18,9 @@ void ATileActor::BeginPlay()
 {
 	Super::BeginPlay();
 	IsLoadedFromBeginPlay = true;
-	Reload();
+
+	if (!IsLoaded)
+		Reload();
 }
 
 void ATileActor::EndPlay(const EEndPlayReason::Type EndPlayReason)

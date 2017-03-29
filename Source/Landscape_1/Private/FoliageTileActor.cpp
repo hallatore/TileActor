@@ -8,8 +8,7 @@ AFoliageTileActor::AFoliageTileActor()
 {
 	DistanceBetween = 200.0f;
 	OffsetFactor = 0.5f;
-	Scale = FFoliageTileNoise();
-	Scale.Min = 1.0f;
+	Scale = FFoliageScaleNoise();
 	MinCullDistance = 0.0f;
 	SpawnChance = 1.0f;
 	AlignWithSlope = true;
@@ -27,6 +26,7 @@ void AFoliageTileActor::Load()
 		return;
 
 	FoliageTiles.AddUninitialized(Size * Size);
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFoliageTileBlockingVolume::StaticClass(), BlockingVolumes);
 
 	int32 componentSize = 2;
 	float FoliageTilesize = Radius * 2 / Size;
@@ -44,7 +44,7 @@ void AFoliageTileActor::Load()
 		for (int32 componentIndex = 0; componentIndex < componentSize; componentIndex++)
 		{
 			UHierarchicalInstancedStaticMeshComponent* component = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
-			component->StaticMesh = Mesh;
+			component->SetStaticMesh(Mesh);
 			component->bSelectable = false;
 			component->bHasPerInstanceHitProxies = true;
 			component->InstancingRandomSeed = seed % INT32_MAX;
@@ -60,7 +60,7 @@ void AFoliageTileActor::Load()
 			else
 				component->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
-			component->AttachTo(rootComponent);
+			component->AttachToComponent(rootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 			component->RegisterComponent();
 			tile->MeshComponents[componentIndex] = component;
 		}	
@@ -70,29 +70,29 @@ void AFoliageTileActor::Load()
 }
 
 void AFoliageTileActor::Unload() {
-	Super::Unload();
+	TArray<UActorComponent*> components = GetComponentsByClass(UHierarchicalInstancedStaticMeshComponent::StaticClass());
 
-	for (int32 i = 0; i < FoliageTiles.Num(); i++)
+	for (int32 i = 0; i < components.Num(); i++)
 	{
-		for (int32 y = 0; y < FoliageTiles[i]->MeshComponents.Num(); y++)
-		{
-			FoliageTiles[i]->MeshComponents[y]->ClearInstances();
-			FoliageTiles[i]->MeshComponents[y]->DetachFromParent();
-			FoliageTiles[i]->MeshComponents[y]->UnregisterComponent();
-		}
-
-		FoliageTiles[i]->MeshComponents.Empty();
+		components[i]->DestroyComponent();
 	}
 
-	FoliageTiles.Empty();
+	Super::Unload();
+}
+
+bool AFoliageTileActor::ShouldExport() {
+	if (RenderInEditor) {
+		FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("You cannot copy this actor while Render In Editor is enabled."));
+		return false;
+	}
+
+	return true;
 }
 
 void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 	if (Mesh == NULL || DistanceBetween <= 0.0)
 		return;
 
-	TArray<AActor*> blockingVolumes;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFoliageTileBlockingVolume::StaticClass(), blockingVolumes);
 	UFoliageTile* tile = FoliageTiles[GetIndex(x, y)];
 	uint32 seed = Hash(Seed + (x * Size) + y);
 
@@ -134,13 +134,13 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 					continue;
 
 				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / Scale.NoiseSize, instanceLocation.Y / Scale.NoiseSize) + 1) / 2.0f;
-				FTransform transform = GetTransform(instanceLocation, Hash(seed), blockingVolumes);
+				FTransform transform = GetTransform(instanceLocation, Hash(seed), BlockingVolumes);
 				float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
 				transform.SetScale3D(FVector(scale, scale, scale));
 
-				for (int32 blockingVolumeIndex = 0; blockingVolumeIndex < blockingVolumes.Num(); blockingVolumeIndex++)
+				for (int32 blockingVolumeIndex = 0; blockingVolumeIndex < BlockingVolumes.Num(); blockingVolumeIndex++)
 				{
-					auto volume = (AFoliageTileBlockingVolume*)blockingVolumes[blockingVolumeIndex];
+					auto volume = (AFoliageTileBlockingVolume*)BlockingVolumes[blockingVolumeIndex];
 					if (volume->GetBrushComponent()->OverlapComponent(transform.GetLocation(), transform.GetRotation(), FCollisionShape()))
 					{
 						if ((Layer == NAME_None && volume->FoliageLayers.Num() == 0) ||

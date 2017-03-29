@@ -6,7 +6,7 @@
 #include "FoliageTileActor.generated.h"
 
 USTRUCT()
-struct FFoliageTileNoise
+struct FFoliageSpawnNoise
 {
 	GENERATED_USTRUCT_BODY()
 
@@ -23,10 +23,37 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", UIMin = "0"))
 		int32 Seed;
 
-	FFoliageTileNoise()
+	FFoliageSpawnNoise()
 	{
 		NoiseSize = 1000;
 		Min = 0.0f;
+		Max = 1.0f;
+		Seed = 0;
+	}
+};
+
+USTRUCT()
+struct FFoliageScaleNoise
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
+		int32 NoiseSize;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
+		float Min;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
+		float Max;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", UIMin = "0"))
+		int32 Seed;
+
+	FFoliageScaleNoise()
+	{
+		NoiseSize = 1000;
+		Min = 1.0f;
 		Max = 1.0f;
 		Seed = 0;
 	}
@@ -38,7 +65,7 @@ class UFoliageTile : public UObject
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
+	UPROPERTY(transient)
 		TArray<UHierarchicalInstancedStaticMeshComponent*> MeshComponents;
 };
 
@@ -54,7 +81,7 @@ public:
 		UStaticMesh* Mesh;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Mesh")
-		FFoliageTileNoise Scale;
+		FFoliageScaleNoise Scale;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		bool AlignWithSlope;
@@ -81,7 +108,7 @@ public:
 		FName Layer;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Spawning")
-		TArray<FFoliageTileNoise> SpawnNoise;
+		TArray<FFoliageSpawnNoise> SpawnNoise;
 
 	/** A value of 0.0 causes this to be calculated to 50 % of the radius. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
@@ -94,10 +121,14 @@ protected:
 	virtual void UpdateTile(int32 x, int32 y, FVector location) override;
 	virtual void Load() override;
 	virtual void Unload() override;
+	virtual bool ShouldExport() override;
 
 private:
-	UPROPERTY(transient, duplicatetransient)
+	UPROPERTY(transient)
 		TArray<UFoliageTile*> FoliageTiles;
+
+	UPROPERTY(transient)
+		TArray<AActor*> BlockingVolumes;
 
 	uint32 Hash(uint32 a);
 	FTransform GetTransform(FVector location, uint32 seed, TArray<AActor*> actorsToIgnore);

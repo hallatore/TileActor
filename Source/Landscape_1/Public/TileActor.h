@@ -43,13 +43,13 @@ public:
 		float Radius;
 
 protected:
-	UPROPERTY()
+	UPROPERTY(transient)
 		int32 Size;
 
-	UPROPERTY()
+	UPROPERTY(transient)
 		bool IsLoaded;
 
-	UPROPERTY()
+	UPROPERTY(transient)
 		bool IsLoadedFromBeginPlay;
 
 	int32 GetIndex(int32 x, int32 y);
@@ -60,22 +60,22 @@ protected:
 	virtual void Unload();
 
 private:
-	UPROPERTY()
+	UPROPERTY(transient)
 		int32 CurrentTileX;
 
-	UPROPERTY()
+	UPROPERTY(transient)
 		int32 CurrentTileY;
 
-	UPROPERTY()
+	UPROPERTY(transient)
 		FVector CurrentTileLocation;
 
-	UPROPERTY()
+	UPROPERTY(transient)
 		FVector CurrentCameraLocation;
 
-	UPROPERTY(transient, duplicatetransient)
+	UPROPERTY(transient)
 		TArray<FTile> Tiles;
 
-	UPROPERTY()
+	UPROPERTY(transient)
 		int32 CurrentUpdateIndex;
 
 	FVector GetTileLocation(int32 x, int32 y);
