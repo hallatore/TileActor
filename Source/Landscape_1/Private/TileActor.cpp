@@ -74,17 +74,13 @@ void ATileActor::Tick(float DeltaTime)
 	}
 
 	if (Tiles.Num() == Size * Size) {
-		for (int32 x = 0; x < Size; x++)
+		FTileInfo tileInfo = GetClosestTileToUpdate();
+
+		if (tileInfo.X >= 0)
 		{
-			for (int32 y = 0; y < Size; y++)
-			{
-				FTile & tile = Tiles[GetIndex(x, y)];
-				if (tile.ShouldUpdate) {
-					tile.ShouldUpdate = false;
-					UpdateTile(x, y, tile.Location);
-					break;
-				}
-			}
+			FTile & tile = Tiles[GetIndex(tileInfo.X, tileInfo.Y)];
+			tile.ShouldUpdate = false;
+			UpdateTile(tileInfo.X, tileInfo.Y, tile.Location);
 		}
 	}
 
@@ -149,6 +145,33 @@ void ATileActor::Tick(float DeltaTime)
 			}
 		}
 	}
+}
+
+FTileInfo ATileActor::GetClosestTileToUpdate()
+{
+	int32 closestX = -1;
+	int32 closestY = -1;
+	float distance = MAX_flt;
+
+	for (int32 x = 0; x < Size; x++)
+	{
+		for (int32 y = 0; y < Size; y++)
+		{
+			FTile & tile = Tiles[GetIndex(x, y)];
+			if (tile.ShouldUpdate) {
+				float tmpDistance = FVector::DistSquaredXY(CurrentCameraLocation, tile.Location);
+
+				if (tmpDistance > distance)
+					continue;
+
+				distance = tmpDistance;
+				closestX = x;
+				closestY = y;
+			}
+		}
+	}
+
+	return FTileInfo(closestX, closestY);
 }
 
 int32 ATileActor::ConvertTileIndex(int32 index)

@@ -23,6 +23,31 @@ public:
 	}
 };
 
+USTRUCT()
+struct FTileInfo
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	UPROPERTY()
+		int32 X;
+
+	UPROPERTY()
+		int32 Y;
+
+	FTileInfo()
+	{
+		X = 0;
+		Y = 0;
+	}
+
+	FTileInfo(int32 x, int32 y)
+	{
+		X = x;
+		Y = y;
+	}
+};
+
 UCLASS()
 class LANDSCAPE_1_API ATileActor : public AActor
 {
@@ -80,4 +105,5 @@ private:
 
 	FVector GetTileLocation(int32 x, int32 y);
 	int32 ConvertTileIndex(int32 index);
+	FTileInfo GetClosestTileToUpdate();
 };
