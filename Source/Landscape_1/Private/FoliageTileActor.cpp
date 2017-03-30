@@ -7,7 +7,7 @@
 AFoliageTileActor::AFoliageTileActor()
 {
 	DistanceBetween = 200.0f;
-	OffsetFactor = 0.5f;
+	OffsetFactor = 0.3f;
 	Scale = FFoliageScaleNoise();
 	MinCullDistance = 0.0f;
 	SpawnChance = 1.0f;
@@ -114,8 +114,10 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 			seed = Hash(seed);
 
 			if (SpawnChance > (double)seed / UINT32_MAX) {
-				float r1 = (double)Hash(seed) / UINT32_MAX;
-				float r2 = (double)Hash(seed) / UINT32_MAX;
+				uint32 tempSeed = Hash(seed);
+				float r1 = ((double)tempSeed / UINT32_MAX * 2) - 1.0f;
+				tempSeed = Hash(tempSeed);
+				float r2 = ((double)tempSeed / UINT32_MAX * 2) - 1.0f;
 				bool spawn = true;
 				float ditterOffset = tileY % 2 > 0 ? ditterOffsetSize * -1 : ditterOffsetSize;
 				FVector instanceLocation = FVector(location.X + split * tileX + (split * r1 * OffsetFactor) + ditterOffset, location.Y + split * tileY + (split * r2 * OffsetFactor), -1000000.0f);
@@ -135,8 +137,9 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 				if (!spawn)
 					continue;
 
+				tempSeed = Hash(tempSeed);
 				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / Scale.NoiseSize, instanceLocation.Y / Scale.NoiseSize) + 1) / 2.0f;
-				FTransform transform = GetTransform(instanceLocation, Hash(seed), BlockingVolumes);
+				FTransform transform = GetTransform(instanceLocation, tempSeed, BlockingVolumes);
 				float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
 				transform.SetScale3D(FVector(scale, scale, scale));
 
