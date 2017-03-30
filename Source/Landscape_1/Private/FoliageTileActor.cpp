@@ -104,6 +104,7 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 	float tileSize = Radius * 2 / Size;
 	int32 arraySize = (int32)(tileSize / DistanceBetween);
 	float split = tileSize / arraySize;
+	float ditterOffsetSize = split / 4;
 
 	for (int32 tileX = 0; tileX < arraySize; tileX++)
 	{
@@ -116,7 +117,8 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 				float r1 = (double)Hash(seed) / UINT32_MAX;
 				float r2 = (double)Hash(seed) / UINT32_MAX;
 				bool spawn = true;
-				FVector instanceLocation = FVector(location.X + split * tileX + (split * r1 * OffsetFactor), location.Y + split * tileY + (split * r2 * OffsetFactor), -1000000.0f);
+				float ditterOffset = tileY % 2 > 0 ? ditterOffsetSize * -1 : ditterOffsetSize;
+				FVector instanceLocation = FVector(location.X + split * tileX + (split * r1 * OffsetFactor) + ditterOffset, location.Y + split * tileY + (split * r2 * OffsetFactor), -1000000.0f);
 
 				for (int32 spawnNoiseIndex = 0; spawnNoiseIndex < SpawnNoise.Num(); spawnNoiseIndex++)
 				{
