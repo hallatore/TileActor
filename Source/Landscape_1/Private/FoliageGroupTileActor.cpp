@@ -1,6 +1,9 @@
 #include "Landscape_1.h"
 #include "FoliageGroupTileActor.h"
+#include "FCalculateTileTask.h"
+#include "FoliageGroup.h"
 #include "SimplexNoise.h"
+#include "TileUtils.h"
 #include "Runtime/Landscape/Classes/Landscape.h"
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -10,11 +13,12 @@ AFoliageGroupTileActor::AFoliageGroupTileActor()
 
 void AFoliageGroupTileActor::Load()
 {	
-	uint32 seed = Hash(Seed);
+	uint32 seed = TileUtils::Hash(Seed);
 	float FoliageTilesize = Radius * 2 / Size;
 	float endCullDistance = Radius - (FoliageTilesize * 1.1f);
 	USceneComponent* rootComponent = GetRootComponent();
 	FoliageGroupTiles.Reserve(Size * Size);
+	TileTaskResults.AddDefaulted(Size * Size);
 
 	for (int groupTileIndex = 0; groupTileIndex < Size * Size; groupTileIndex++)
 	{
@@ -38,7 +42,7 @@ void AFoliageGroupTileActor::Load()
 
 				for (int meshIndex = 0; meshIndex < item.Meshes.Num(); meshIndex++)
 				{
-					seed = Hash(seed);
+					seed = TileUtils::Hash(seed);
 					UHierarchicalInstancedStaticMeshComponent* component = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
 					component->SetStaticMesh(item.Meshes[meshIndex]);
 					component->bSelectable = false;
@@ -47,7 +51,7 @@ void AFoliageGroupTileActor::Load()
 					component->bAffectDistanceFieldLighting = item.AffectDistanceFieldLighting;
 					component->CastShadow = item.CastShadow;
 					component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-					component->InstanceEndCullDistance = endCullDistance;
+					component->InstanceEndCullDistance = item.CullDistance > 0.0f ? item.CullDistance : endCullDistance;
 					component->AttachToComponent(rootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 					component->RegisterComponent();
 					tileItem->MeshComponents.Add(component);
@@ -72,171 +76,105 @@ void AFoliageGroupTileActor::Unload()
 	Super::Unload();
 }
 
-void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
+void AFoliageGroupTileActor::TaskResultCompleted(FTileTaskResult tileTaskResult)
 {
-	UFoliageGroupTile* tile = FoliageGroupTiles[GetIndex(x, y)];
-	ClearInstances(tile);
+	TileTaskResults[tileTaskResult.TileIndex] = tileTaskResult;
+}
 
-	uint32 seed = Hash(Seed + (x * Size) + y);
-	float tileSize = Radius * 2 / Size;
-	GridArrayType collisionGrid;
-	collisionGrid.AddDefaulted(collisionGridSize * collisionGridSize);
+int AFoliageGroupTileActor::GetClosestTileToRender(FVector currentLocation)
+{
+	int32 index = -1;
+	float distance = MAX_flt;
 
-	for (int groupIndex = 0; groupIndex < Groups.Num(); groupIndex++)
+	for (int tileIndex = 0; tileIndex < TileTaskResults.Num(); tileIndex++)
 	{
-		FFoliageGroup& group = Groups[groupIndex];
-		TArray<FSortItem> itemsSorted;
-
-		for (int itemIndex = 0; itemIndex < group.Items.Num(); itemIndex++)
+		if (TileTaskResults[tileIndex].ShouldRender)
 		{
-			itemsSorted.Add(FSortItem(itemIndex, group.Items[itemIndex].Width));
-		}
+			float tmpDistance = FVector::DistSquaredXY(currentLocation, TileTaskResults[tileIndex].Location);
 
-		itemsSorted.Sort([](const FSortItem& a, const FSortItem& b) {
-			return a.Width > b.Width;
-		});
+			if (tmpDistance > distance)
+				continue;
 
-		for (int tmpIndex = 0; tmpIndex < group.Items.Num(); tmpIndex++)
-		{
-			int itemIndex = itemsSorted[tmpIndex].Index;
-			FFoliageGroupItem& item = group.Items[itemIndex];
-			int itemRadius = FMath::Max<int>(1, item.Width / 2);
-			float itemWorldWidth = tileSize / collisionGridSize * item.Width;
-			GridArrayType itemCollisionGrid;
-			itemCollisionGrid.AddDefaulted(collisionGridSize * collisionGridSize);
-
-			for (int tileX = 0; tileX < collisionGridSize; tileX++)
-			{
-				for (int tileY = 0; tileY < collisionGridSize; tileY++)
-				{
-					seed = Hash(seed);
-
-					if (collisionGrid[(tileX * collisionGridSize) + tileY] || 
-						tileX < itemRadius || 
-						tileY < itemRadius || 
-						collisionGridSize - tileX < itemRadius || 
-						collisionGridSize - tileY < itemRadius)
-						continue;
-
-					auto tileSeed = seed;
-					bool spawn = true;
-					float fallOffSpawnChance = 0.0f;
-					float extraWidth = 0.0f;
-					tileSeed = Hash(tileSeed);
-					float r1 = ((double)tileSeed / UINT32_MAX * 2) - 1.0f;
-					tileSeed = Hash(tileSeed);
-					float r2 = ((double)tileSeed / UINT32_MAX * 2) - 1.0f;
-					FVector tileLocation = FVector(
-						location.X + (tileSize / collisionGridSize * tileX) + (itemWorldWidth * r1 * item.OffsetFactor),
-						location.Y + (tileSize / collisionGridSize * tileY) + (itemWorldWidth * r2 * item.OffsetFactor),
-						-1000000.0f);
-
-					// Parent Noise check
-					for (int noiseIndex = 0; noiseIndex < group.Noise.Num(); noiseIndex++)
-					{
-						auto& noise = group.Noise[noiseIndex];
-						float noiseSeed = 100000.0f * ((float)Hash(noise.Seed) / UINT32_MAX);
-						float noiseValue = FMath::Abs(USimplexNoise::SimplexNoise2D((tileLocation.X + noiseSeed) / noise.NoiseSize, (tileLocation.Y + noiseSeed) / noise.NoiseSize));
-
-						if (noiseValue < noise.Min || noiseValue > noise.Max)
-							spawn = false;
-
-						fallOffSpawnChance = GetFallOffSpawnChance(noise, noiseValue);
-						tileSeed = Hash(tileSeed);
-						if (fallOffSpawnChance < (float)tileSeed / UINT32_MAX)
-						{
-							extraWidth = (item.Spacing * 2) * (1.0f - fallOffSpawnChance);
-						}
-					}
-
-					if (!spawn)
-						continue;
-
-					// Noise check
-					for (int noiseIndex = 0; noiseIndex < item.Noise.Num(); noiseIndex++)
-					{
-						auto& noise = item.Noise[noiseIndex];
-						float noiseSeed = 100000.0f * ((float)Hash(noise.Seed) / UINT32_MAX);
-						float noiseValue = FMath::Abs(USimplexNoise::SimplexNoise2D((tileLocation.X + noiseSeed) / noise.NoiseSize, (tileLocation.Y + noiseSeed) / noise.NoiseSize));
-
-						if (noiseValue < noise.Min || noiseValue > noise.Max)
-							spawn = false;
-
-						fallOffSpawnChance = GetFallOffSpawnChance(noise, noiseValue);
-						tileSeed = Hash(tileSeed);
-						if (fallOffSpawnChance < (float)tileSeed / UINT32_MAX)
-						{
-							extraWidth = (item.Spacing * 2) * (1.0f - fallOffSpawnChance);
-						}
-					}
-
-					if (!spawn)
-						continue;
-
-					auto spawnSpace = CalculateSpawnSpace(collisionGrid, collisionGridSize, tileX, tileY, item.Width / 2 + item.Spacing);
-
-					if (spawnSpace.IsSpace)
-						spawnSpace = CalculateSpawnSpace(itemCollisionGrid, collisionGridSize, tileX, tileY, item.Width / 2 + item.Spacing);
-
-					if (!spawnSpace.IsSpace)
-					{
-						tileY += FMath::Max<int>(0, (item.Width / 2 + item.Spacing) - spawnSpace.FailedDistanceY);
-						continue;
-					}
-
-					tileSeed = Hash(tileSeed);
-					if (extraWidth > 0 && (fallOffSpawnChance + 0.5f) / 1.5f < (float)tileSeed / UINT32_MAX)
-					{
-						Spawn(itemCollisionGrid, collisionGridSize, tileX, tileY, extraWidth);
-						continue;
-					}
-
-					Spawn(itemCollisionGrid, collisionGridSize, tileX, tileY, item.Width);
-
-					// Spawn chance check
-					tileSeed = Hash(tileSeed);
-					if (item.SpawnChance < (float)tileSeed / UINT32_MAX)
-						continue;
-
-					Spawn(collisionGrid, collisionGridSize, tileX, tileY, item.Width);
-
-					tileSeed = Hash(tileSeed);
-					TArray<AActor*> BlockingVolumes;
-					FTransform transform = GetTransform(tileLocation, tileSeed, BlockingVolumes);
-					float noise = FMath::Abs(USimplexNoise::SimplexNoise2D(tileLocation.X / item.Scale.NoiseSize, tileLocation.Y / item.Scale.NoiseSize));
-					float scale = item.Scale.Min + ((item.Scale.Max - item.Scale.Min) * noise);
-					transform.SetScale3D(FVector(scale, scale, scale));
-
-					if (transform.GetLocation().Z == -100000.0f)
-						continue;
-
-					//for (int32 blockingVolumeIndex = 0; blockingVolumeIndex < BlockingVolumes.Num(); blockingVolumeIndex++)
-					//{
-					//	auto volume = (AFoliageTileBlockingVolume*)BlockingVolumes[blockingVolumeIndex];
-					//	if (volume->GetBrushComponent()->OverlapComponent(transform.GetLocation(), transform.GetRotation(), FCollisionShape()))
-					//	{
-					//		if ((Layer == NAME_None && volume->FoliageLayers.Num() == 0) ||
-					//			(Layer != NAME_None && volume->FoliageLayers.Contains(Layer)))
-					//		{
-					//			spawn = false;
-					//			break;
-					//		}
-					//	}
-					//}
-
-					if (!spawn)
-						continue;
-
-					auto meshComponents = tile->Groups[groupIndex]->Items[itemIndex]->MeshComponents;
-					tileSeed = Hash(tileSeed);
-					int meshIndex = tileSeed % meshComponents.Num();
-					meshComponents[meshIndex]->AddInstance(transform);
-				}
-			}
+			distance = tmpDistance;
+			index = tileIndex;
 		}
 	}
 
-	collisionGrid.Empty();
+	return index;
+}
+
+void AFoliageGroupTileActor::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	auto world = GetWorld();
+	if (world == nullptr)
+		return;
+
+	FVector currentCameraLocation;
+	auto player = world->GetFirstLocalPlayerFromController();
+
+	if (player != NULL)
+	{
+		currentCameraLocation = player->LastViewLocation;
+	}
+	else
+	{
+		auto viewLocations = world->ViewLocationsRenderedLastFrame;
+
+		if (viewLocations.Num() == 0)
+			return;
+
+		currentCameraLocation = viewLocations[0];
+	}
+
+	int tileIndex = GetClosestTileToRender(currentCameraLocation);
+
+	if (tileIndex == -1)
+		return;
+
+	auto& result = TileTaskResults[tileIndex];
+
+	if (result.ShouldRender) 
+	{
+		result.ShouldRender = false;
+		UFoliageGroupTile* tile = FoliageGroupTiles[tileIndex];
+		float tileSize = Radius * 2 / Size;
+		ClearInstances(tile);
+
+		auto& tileTaskResult = TileTaskResults[tileIndex];
+
+		for (int i = 0; i < tileTaskResult.Items.Num(); i++)
+		{
+			auto& item = tileTaskResult.Items[i];
+			auto meshComponents = tile->Groups[item.GroupIndex]->Items[item.ItemIndex]->MeshComponents;
+			auto tileSeed = TileUtils::Hash(item.Seed);
+			int meshIndex = tileSeed % meshComponents.Num();
+
+			TArray<AActor*> BlockingVolumes;
+			tileSeed = TileUtils::Hash(tileSeed);
+			FTransform transform = GetTransform(item.Location, tileSeed, BlockingVolumes);
+			transform.SetScale3D(FVector(item.Scale, item.Scale, item.Scale));
+
+			if (transform.GetLocation().Z == -100000.0f)
+				continue;
+
+			meshComponents[meshIndex]->AddInstance(transform);
+		}
+
+		result.Items.Empty();
+	}
+}
+
+void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
+{
+	int tileIndex = GetIndex(x, y);
+	uint32 seed = TileUtils::Hash(Seed + (x * Size) + y);
+	UFoliageGroupTile* tile = FoliageGroupTiles[tileIndex];
+	float tileSize = Radius * 2 / Size;
+	FTileTaskResultDelegate taskResultDelegate;
+	taskResultDelegate.BindUObject(this, &AFoliageGroupTileActor::TaskResultCompleted);
+	(new FAutoDeleteAsyncTask<FCalculateTileTask>(location, tileIndex, Groups, tileSize, seed, taskResultDelegate))->StartBackgroundTask();
 }
 
 void AFoliageGroupTileActor::PostEditChangeProperty(struct FPropertyChangedEvent& e)
@@ -253,23 +191,6 @@ void AFoliageGroupTileActor::PostEditChangeProperty(struct FPropertyChangedEvent
 			item.CalculatedWidth = tileSize / collisionGridSize * item.Width;
 		}
 	}
-}
-
-float AFoliageGroupTileActor::GetFallOffSpawnChance(FFoliageGroupSpawnNoise& noise, float noiseValue) 
-{
-	if (noise.FallOff == 0.0f)
-		return 1.0f;
-
-	float minFallOff = 1.0f / noise.FallOff * (noiseValue - noise.Min);
-	float maxFallOff = 1.0f / noise.FallOff * (noise.Max - noiseValue);
-
-	if (noise.Min > 0.0f && (noise.Max == 1.0f || minFallOff < maxFallOff))
-		return minFallOff;
-
-	if (noise.Max < 1.0f && (noise.Min == 0.0f || minFallOff > maxFallOff))
-		return maxFallOff;
-
-	return 1.0f;
 }
 
 FTransform AFoliageGroupTileActor::GetTransform(FVector location, uint32 seed, TArray<AActor*> actorsToIgnore) 
@@ -297,70 +218,6 @@ FTransform AFoliageGroupTileActor::GetTransform(FVector location, uint32 seed, T
 	return result;
 }
 
-FItemSpawnSpace AFoliageGroupTileActor::CalculateSpawnSpace(GridArrayType& collisionGrid, int size, int x, int y, int spacing) {
-	for (int tmpX = 0; tmpX <= spacing; tmpX++)
-	{
-		for (int tmpY = 0; tmpY <= spacing; tmpY++)
-		{
-			int gridPlusX = x + tmpX;
-			int gridPlusY = y + tmpY;
-			int gridMinusX = x - tmpX;
-			int gridMinusY = y - tmpY;
-
-			if ((gridMinusX >= 0 && gridMinusY >= 0 && collisionGrid[(gridMinusX * size) + gridMinusY]) ||
-				(gridPlusX < size && gridMinusY >= 0 && collisionGrid[(gridPlusX * size) + gridMinusY]) ||
-				(gridPlusX < size && gridPlusY < size && collisionGrid[(gridPlusX * size) + gridPlusY]) ||
-				(gridMinusX >= 0 && gridPlusY < size && collisionGrid[(gridMinusX * size) + gridPlusY]))
-				return FItemSpawnSpace(false, tmpY);
-		}
-	}
-
-	return FItemSpawnSpace(true, 0);
-}
-
-void AFoliageGroupTileActor::Spawn(GridArrayType& collisionGrid, int size, int x, int y, int width) {
-	//UE_LOG(LogStaticMesh, Display, TEXT("AFoliageGroupTileActor::Spawn: x: %d, y: %d, width: %d"), x, y, width);
-
-	if (width == 1)
-	{
-		collisionGrid[(x * size) + y] = true;
-		return;
-	}
-
-	int radius = width / 2;
-	int startX = FMath::Max<int>(0, x - radius);
-	int startY = FMath::Max<int>(0, y - radius);
-	int endX = FMath::Min<int>(size, x + radius);
-	int endY = FMath::Min<int>(size, y + radius);
-
-	for (int tmpX = startX; tmpX < endX; tmpX++)
-	{
-		for (int tmpY = startY; tmpY < endY; tmpY++)
-		{
-			collisionGrid[(tmpX * size) + tmpY] = true;
-		}
-	}
-}
-
-float AFoliageGroupTileActor::GetItemMinWidth() {
-	float width = MAX_flt;
-
-	for (int groupIndex = 0; groupIndex < Groups.Num(); groupIndex++)
-	{
-		auto group = Groups[groupIndex];
-
-		for (int itemIndex = 0; itemIndex < group.Items.Num(); itemIndex++)
-		{
-			auto item = group.Items[itemIndex];
-			
-			if (item.Width < width)
-				width = item.Width;
-		}
-	}
-
-	return width;
-}
-
 void AFoliageGroupTileActor::ClearInstances(UFoliageGroupTile* tile)
 {
 	for (int groupIndex = 0; groupIndex < tile->Groups.Num(); groupIndex++)
@@ -377,15 +234,5 @@ void AFoliageGroupTileActor::ClearInstances(UFoliageGroupTile* tile)
 			}
 		}
 	}
-}
-
-uint32 AFoliageGroupTileActor::Hash(uint32 a)
-{
-	a = (a ^ 61) ^ (a >> 16);
-	a = a + (a << 3);
-	a = a ^ (a >> 4);
-	a = a * 0x27d4eb2d;
-	a = a ^ (a >> 15);
-	return a;
 }
 
