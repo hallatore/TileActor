@@ -19,7 +19,6 @@ AFoliageTileActor::AFoliageTileActor()
 
 void AFoliageTileActor::Load()
 {
-	Super::Load();
 	uint32 seed = Hash(Seed);
 
 	if (Mesh == NULL)
@@ -50,15 +49,11 @@ void AFoliageTileActor::Load()
 			component->InstancingRandomSeed = seed % INT32_MAX;
 			component->bAffectDistanceFieldLighting = AffectDistanceFieldLighting;
 			component->CastShadow = CastShadow;
+			component->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 
 			float cullDistance = (endCullDistance / componentSize * (componentIndex + 1)) * FMath::Max(0.0f, (1.0f - (1.0f / endCullDistance * minCullDistance)));
 			component->InstanceEndCullDistance = endCullDistance - cullDistance;
 			component->InstanceStartCullDistance = endCullDistance - cullDistance - (endCullDistance / componentSize * (componentIndex + 1));
-
-			if (Collision == false)
-				component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			else
-				component->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
 			component->AttachToComponent(rootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 			component->RegisterComponent();
@@ -66,7 +61,7 @@ void AFoliageTileActor::Load()
 		}	
 	}
 
-	IsLoaded = true;
+	Super::Load();
 }
 
 void AFoliageTileActor::Unload() {
@@ -125,7 +120,7 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 				for (int32 spawnNoiseIndex = 0; spawnNoiseIndex < SpawnNoise.Num(); spawnNoiseIndex++)
 				{
 					float noiseSeed = 100000.0f * ((float)Hash(SpawnNoise[spawnNoiseIndex].Seed) / UINT32_MAX);
-					float noise = (USimplexNoise::SimplexNoise2D((instanceLocation.X + noiseSeed) / SpawnNoise[spawnNoiseIndex].NoiseSize, (instanceLocation.Y + noiseSeed) / SpawnNoise[spawnNoiseIndex].NoiseSize) + 1) / 2.0f;
+					float noise = FMath::Abs(USimplexNoise::SimplexNoise2D((instanceLocation.X + noiseSeed) / SpawnNoise[spawnNoiseIndex].NoiseSize, (instanceLocation.Y + noiseSeed) / SpawnNoise[spawnNoiseIndex].NoiseSize));
 
 					if (noise < SpawnNoise[spawnNoiseIndex].Min || noise > SpawnNoise[spawnNoiseIndex].Max)
 					{
@@ -138,7 +133,7 @@ void AFoliageTileActor::UpdateTile(int32 x, int32 y, FVector location) {
 					continue;
 
 				tempSeed = Hash(tempSeed);
-				float noise = (USimplexNoise::SimplexNoise2D(instanceLocation.X / Scale.NoiseSize, instanceLocation.Y / Scale.NoiseSize) + 1) / 2.0f;
+				float noise = FMath::Abs(USimplexNoise::SimplexNoise2D(instanceLocation.X / Scale.NoiseSize, instanceLocation.Y / Scale.NoiseSize));
 				FTransform transform = GetTransform(instanceLocation, tempSeed, BlockingVolumes);
 				float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
 				transform.SetScale3D(FVector(scale, scale, scale));

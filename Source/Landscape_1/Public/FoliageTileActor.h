@@ -89,7 +89,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		bool Collision;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Mesh")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		uint32 CastShadow : 1;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
