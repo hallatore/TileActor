@@ -37,6 +37,33 @@ public:
 };
 
 USTRUCT()
+struct FFoliageGroupScaleNoise
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
+		int32 NoiseSize;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
+		float Min;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
+		float Max;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", UIMin = "0"))
+		int32 Seed;
+
+	FFoliageGroupScaleNoise()
+	{
+		NoiseSize = 1000;
+		Min = 1.0f;
+		Max = 1.0f;
+		Seed = 0;
+	}
+};
+
+USTRUCT()
 struct FFoliageGroupItem
 {
 	GENERATED_USTRUCT_BODY()
@@ -44,6 +71,9 @@ struct FFoliageGroupItem
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 		TArray<UStaticMesh*> Meshes;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
+		FFoliageGroupScaleNoise Scale;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "1", UIMin = "1"))
 		int Width;
@@ -54,7 +84,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", UIMin = "0"))
 		int Spacing;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"), Category = "Spawning")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", UIMin = "0.0"))
 		float OffsetFactor;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
@@ -63,8 +93,15 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 		TArray<FFoliageGroupSpawnNoise> Noise;
 
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+		uint32 CastShadow : 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+		bool AffectDistanceFieldLighting;
+
 	FFoliageGroupItem()
 	{
+		Scale = FFoliageGroupScaleNoise();
 		Width = 10;
 		Spacing = 2;
 		OffsetFactor = 0.3f;
@@ -165,6 +202,9 @@ public:
 	}
 };
 
+const int collisionGridSize = 400;
+typedef TArray<bool, TInlineAllocator<80000>> GridArrayType;
+
 UCLASS()
 class LANDSCAPE_1_API AFoliageGroupTileActor : public ATileActor
 {
@@ -175,12 +215,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
 		TArray<FFoliageGroup> Groups;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Mesh")
-		uint32 CastShadow : 1;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Mesh")
-		bool AffectDistanceFieldLighting;
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
 
@@ -197,9 +231,9 @@ private:
 	void ClearInstances(UFoliageGroupTile* tile);
 	float GetItemMinWidth();
 	FTransform GetTransform(FVector location, uint32 seed, TArray<AActor*> actorsToIgnore);
-	FItemSpawnSpace CalculateSpawnSpace(TArray<bool>& collisionGrid, int size, int x, int y, int spacing);
+	FItemSpawnSpace CalculateSpawnSpace(GridArrayType& collisionGrid, int size, int x, int y, int spacing);
 	float GetFallOffSpawnChance(FFoliageGroupSpawnNoise& noise, float noiseValue);
-	void Spawn(TArray<bool>& collisionGrid, int size, int x, int y, int width);
+	void Spawn(GridArrayType& collisionGrid, int size, int x, int y, int width);
 
 	UPROPERTY(transient)
 		TArray<UFoliageGroupTile*> FoliageGroupTiles;

@@ -8,8 +8,6 @@ AFoliageGroupTileActor::AFoliageGroupTileActor()
 {
 }
 
-const int collisionGridSize = 100;
-
 void AFoliageGroupTileActor::Load()
 {	
 	uint32 seed = Hash(Seed);
@@ -46,8 +44,8 @@ void AFoliageGroupTileActor::Load()
 					component->bSelectable = false;
 					component->bHasPerInstanceHitProxies = true;
 					component->InstancingRandomSeed = seed % UINT32_MAX;
-					component->bAffectDistanceFieldLighting = AffectDistanceFieldLighting;
-					component->CastShadow = CastShadow;
+					component->bAffectDistanceFieldLighting = item.AffectDistanceFieldLighting;
+					component->CastShadow = item.CastShadow;
 					component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 					component->InstanceEndCullDistance = endCullDistance;
 					component->AttachToComponent(rootComponent, FAttachmentTransformRules::KeepRelativeTransform);
@@ -81,7 +79,7 @@ void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
 
 	uint32 seed = Hash(Seed + (x * Size) + y);
 	float tileSize = Radius * 2 / Size;
-	TArray<bool> collisionGrid;
+	GridArrayType collisionGrid;
 	collisionGrid.AddDefaulted(collisionGridSize * collisionGridSize);
 
 	for (int groupIndex = 0; groupIndex < Groups.Num(); groupIndex++)
@@ -104,7 +102,7 @@ void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
 			FFoliageGroupItem& item = group.Items[itemIndex];
 			int itemRadius = FMath::Max<int>(1, item.Width / 2);
 			float itemWorldWidth = tileSize / collisionGridSize * item.Width;
-			TArray<bool> itemCollisionGrid;
+			GridArrayType itemCollisionGrid;
 			itemCollisionGrid.AddDefaulted(collisionGridSize * collisionGridSize);
 
 			for (int tileX = 0; tileX < collisionGridSize; tileX++)
@@ -132,9 +130,6 @@ void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
 						location.X + (tileSize / collisionGridSize * tileX) + (itemWorldWidth * r1 * item.OffsetFactor),
 						location.Y + (tileSize / collisionGridSize * tileY) + (itemWorldWidth * r2 * item.OffsetFactor),
 						-1000000.0f);
-
-					///FVector tileLocation = FVector(location.X, location.Y, -1000000.0f);
-					//UE_LOG(LogStaticMesh, Display, TEXT("Spawning?"));
 
 					// Parent Noise check
 					for (int noiseIndex = 0; noiseIndex < group.Noise.Num(); noiseIndex++)
@@ -208,10 +203,10 @@ void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
 					tileSeed = Hash(tileSeed);
 					TArray<AActor*> BlockingVolumes;
 					FTransform transform = GetTransform(tileLocation, tileSeed, BlockingVolumes);
-					//float scale = Scale.Min + ((Scale.Max - Scale.Min) * noise);
-					//transform.SetScale3D(FVector(scale, scale, scale));
+					float noise = FMath::Abs(USimplexNoise::SimplexNoise2D(tileLocation.X / item.Scale.NoiseSize, tileLocation.Y / item.Scale.NoiseSize));
+					float scale = item.Scale.Min + ((item.Scale.Max - item.Scale.Min) * noise);
+					transform.SetScale3D(FVector(scale, scale, scale));
 
-					//UE_LOG(LogStaticMesh, Display, TEXT("Spawning?"));
 					if (transform.GetLocation().Z == -100000.0f)
 						continue;
 
@@ -232,7 +227,6 @@ void AFoliageGroupTileActor::UpdateTile(int32 x, int32 y, FVector location)
 					if (!spawn)
 						continue;
 
-					//UE_LOG(LogStaticMesh, Display, TEXT("Spawning"));
 					auto meshComponents = tile->Groups[groupIndex]->Items[itemIndex]->MeshComponents;
 					tileSeed = Hash(tileSeed);
 					int meshIndex = tileSeed % meshComponents.Num();
@@ -293,24 +287,17 @@ FTransform AFoliageGroupTileActor::GetTransform(FVector location, uint32 seed, T
 	Objects.Add(EObjectTypeQuery::ObjectTypeQuery1);
 
 	// Todo: Find a way to trace only landscapes for better performance
-	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), Start, End, Objects, false, actorsToIgnore, EDrawDebugTrace::None, HitData, true))
+	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), Start, End, Objects, false, actorsToIgnore, EDrawDebugTrace::None, HitData, true) &&
+		HitData.GetActor() && 
+		HitData.Actor->IsA(ALandscape::StaticClass()))
 	{
-		if (HitData.GetActor() && HitData.Actor->IsA(ALandscape::StaticClass()))
-		{
-			result.SetTranslation(FVector(location.X, location.Y, HitData.ImpactPoint.Z));
-
-			/*if (AlignWithSlope == true)
-			{
-				FRotator rotation = FRotationMatrix::MakeFromZ(HitData.Normal).Rotator();
-				result.SetRotation(FQuat(rotation) * rotator);
-			}*/
-		}
+		result.SetTranslation(FVector(location.X, location.Y, HitData.ImpactPoint.Z));
 	}
 
 	return result;
 }
 
-FItemSpawnSpace AFoliageGroupTileActor::CalculateSpawnSpace(TArray<bool>& collisionGrid, int size, int x, int y, int spacing) {
+FItemSpawnSpace AFoliageGroupTileActor::CalculateSpawnSpace(GridArrayType& collisionGrid, int size, int x, int y, int spacing) {
 	for (int tmpX = 0; tmpX <= spacing; tmpX++)
 	{
 		for (int tmpY = 0; tmpY <= spacing; tmpY++)
@@ -331,7 +318,7 @@ FItemSpawnSpace AFoliageGroupTileActor::CalculateSpawnSpace(TArray<bool>& collis
 	return FItemSpawnSpace(true, 0);
 }
 
-void AFoliageGroupTileActor::Spawn(TArray<bool>& collisionGrid, int size, int x, int y, int width) {
+void AFoliageGroupTileActor::Spawn(GridArrayType& collisionGrid, int size, int x, int y, int width) {
 	//UE_LOG(LogStaticMesh, Display, TEXT("AFoliageGroupTileActor::Spawn: x: %d, y: %d, width: %d"), x, y, width);
 
 	if (width == 1)
