@@ -65,20 +65,21 @@ void AFoliageGroupTileActor::Load()
 
 void AFoliageGroupTileActor::Unload()
 {
+	Super::Unload();
+	FoliageGroupTiles.Empty();
+	TileTaskResults.Empty();
 	TArray<UActorComponent*> components = GetComponentsByClass(UHierarchicalInstancedStaticMeshComponent::StaticClass());
 
 	for (int32 i = 0; i < components.Num(); i++)
 	{
 		components[i]->DestroyComponent();
 	}
-
-	FoliageGroupTiles.Empty();
-	Super::Unload();
 }
 
 void AFoliageGroupTileActor::TaskResultCompleted(FTileTaskResult tileTaskResult)
 {
-	TileTaskResults[tileTaskResult.TileIndex] = tileTaskResult;
+	if (TileTaskResults.Num() > tileTaskResult.TileIndex)
+		TileTaskResults[tileTaskResult.TileIndex] = tileTaskResult;
 }
 
 int AFoliageGroupTileActor::GetClosestTileToRender(FVector currentLocation)
@@ -107,26 +108,14 @@ void AFoliageGroupTileActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	auto world = GetWorld();
-	if (world == nullptr)
+	if (!IsLoaded)
 		return;
 
-	FVector currentCameraLocation;
-	auto player = world->GetFirstLocalPlayerFromController();
+	auto world = GetWorld();
+	FVector currentCameraLocation = TileUtils::GetCurrentCameraLocation(world);
 
-	if (player != NULL)
-	{
-		currentCameraLocation = player->LastViewLocation;
-	}
-	else
-	{
-		auto viewLocations = world->ViewLocationsRenderedLastFrame;
-
-		if (viewLocations.Num() == 0)
-			return;
-
-		currentCameraLocation = viewLocations[0];
-	}
+	if (TileUtils::IsEmptyFVector(currentCameraLocation))
+		return;
 
 	int tileIndex = GetClosestTileToRender(currentCameraLocation);
 
@@ -135,18 +124,16 @@ void AFoliageGroupTileActor::Tick(float DeltaTime)
 
 	auto& result = TileTaskResults[tileIndex];
 
-	if (result.ShouldRender) 
+	if (result.ShouldRender && FoliageGroupTiles.Num() > tileIndex)
 	{
 		result.ShouldRender = false;
 		UFoliageGroupTile* tile = FoliageGroupTiles[tileIndex];
 		float tileSize = Radius * 2 / Size;
 		ClearInstances(tile);
 
-		auto& tileTaskResult = TileTaskResults[tileIndex];
-
-		for (int i = 0; i < tileTaskResult.Items.Num(); i++)
+		for (int i = 0; i < result.Items.Num(); i++)
 		{
-			auto& item = tileTaskResult.Items[i];
+			auto& item = result.Items[i];
 			auto meshComponents = tile->Groups[item.GroupIndex]->Items[item.ItemIndex]->MeshComponents;
 			auto tileSeed = TileUtils::Hash(item.Seed);
 			int meshIndex = tileSeed % meshComponents.Num();

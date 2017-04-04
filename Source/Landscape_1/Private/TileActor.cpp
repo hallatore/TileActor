@@ -1,4 +1,5 @@
 #include "Landscape_1.h"
+#include "TileUtils.h"
 #include "TileActor.h"
 
 ATileActor::ATileActor()
@@ -73,8 +74,14 @@ void ATileActor::Tick(float DeltaTime)
 		return;
 	}
 
+	auto world = GetWorld();
+	auto currentCameraLocation = TileUtils::GetCurrentCameraLocation(world);
+
+	if (TileUtils::IsEmptyFVector(currentCameraLocation))
+		return;
+
 	if (Tiles.Num() == Size * Size) {
-		FTileInfo tileInfo = GetClosestTileToUpdate();
+		FTileInfo tileInfo = GetClosestTileToUpdate(currentCameraLocation);
 
 		if (tileInfo.X >= 0)
 		{
@@ -84,33 +91,13 @@ void ATileActor::Tick(float DeltaTime)
 		}
 	}
 
-	auto world = GetWorld();
-	if (world == nullptr)
-		return;
-
-	auto player = world->GetFirstLocalPlayerFromController();
-
-	if (player != NULL)
-	{
-		CurrentCameraLocation = player->LastViewLocation;
-	}
-	else 
-	{
-		auto viewLocations = world->ViewLocationsRenderedLastFrame;
-
-		if (viewLocations.Num() == 0)
-			return;
-
-		CurrentCameraLocation = viewLocations[0];
-	}
-
 	float tileSize = Radius * 2 / Size;
-	float disX = CurrentCameraLocation.X - CurrentTileLocation.X;
-	float disY = CurrentCameraLocation.Y - CurrentTileLocation.Y;
+	float disX = currentCameraLocation.X - CurrentTileLocation.X;
+	float disY = currentCameraLocation.Y - CurrentTileLocation.Y;
 	bool updated = false;
 
 	if (disX > tileSize || disX * -1 > tileSize / 2) {
-		int32 currentX = (int32)floor(CurrentCameraLocation.X / tileSize);
+		int32 currentX = (int32)floor(currentCameraLocation.X / tileSize);
 		CurrentTileLocation.X = currentX * (int32)tileSize;
 		CurrentTileX = currentX % Size;
 		updated = true;
@@ -120,7 +107,7 @@ void ATileActor::Tick(float DeltaTime)
 	}
 
 	if (disY > tileSize || disY * -1 > tileSize / 2) {
-		int32 currentY = (int32)floor(CurrentCameraLocation.Y / tileSize);
+		int32 currentY = (int32)floor(currentCameraLocation.Y / tileSize);
 		CurrentTileLocation.Y = currentY * (int32)tileSize;
 		CurrentTileY = currentY % Size;
 		updated = true;
@@ -147,7 +134,7 @@ void ATileActor::Tick(float DeltaTime)
 	}
 }
 
-FTileInfo ATileActor::GetClosestTileToUpdate()
+FTileInfo ATileActor::GetClosestTileToUpdate(FVector location)
 {
 	int32 closestX = -1;
 	int32 closestY = -1;
@@ -159,7 +146,7 @@ FTileInfo ATileActor::GetClosestTileToUpdate()
 		{
 			FTile & tile = Tiles[GetIndex(x, y)];
 			if (tile.ShouldUpdate) {
-				float tmpDistance = FVector::DistSquaredXY(CurrentCameraLocation, tile.Location);
+				float tmpDistance = FVector::DistSquaredXY(location, tile.Location);
 
 				if (tmpDistance > distance)
 					continue;

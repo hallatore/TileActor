@@ -95,9 +95,6 @@ private:
 		FVector CurrentTileLocation;
 
 	UPROPERTY(transient)
-		FVector CurrentCameraLocation;
-
-	UPROPERTY(transient)
 		TArray<FTile> Tiles;
 
 	UPROPERTY(transient)
@@ -105,5 +102,5 @@ private:
 
 	FVector GetTileLocation(int32 x, int32 y);
 	int32 ConvertTileIndex(int32 index);
-	FTileInfo GetClosestTileToUpdate();
+	FTileInfo GetClosestTileToUpdate(FVector location);
 };

@@ -65,6 +65,7 @@ void AFoliageTileActor::Load()
 }
 
 void AFoliageTileActor::Unload() {
+	FoliageTiles.Empty();
 	TArray<UActorComponent*> components = GetComponentsByClass(UHierarchicalInstancedStaticMeshComponent::StaticClass());
 
 	for (int32 i = 0; i < components.Num(); i++)
