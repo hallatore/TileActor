@@ -136,8 +136,11 @@ void AFoliageGroupTileActor::Tick(float DeltaTime)
 			auto& item = result.Items[i];
 			auto meshComponents = tile->Groups[item.GroupIndex]->Items[item.ItemIndex]->MeshComponents;
 			auto tileSeed = TileUtils::Hash(item.Seed);
-			int meshIndex = tileSeed % meshComponents.Num();
 
+			if (meshComponents.Num() == 0)
+				continue;
+
+			int meshIndex = tileSeed % meshComponents.Num();
 			TArray<AActor*> BlockingVolumes;
 			tileSeed = TileUtils::Hash(tileSeed);
 			FTransform transform = GetTransform(item.Location, tileSeed, BlockingVolumes);
